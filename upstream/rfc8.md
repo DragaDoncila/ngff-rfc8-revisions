@@ -48,7 +48,7 @@ reading this paragraph(s).
 
 This proposal introduces a general extensibility mechanism for OME-Zarr
 metadata. It defines a common Node interface, a system for referencing nodes
-locally and remotely, and an extension scheme that allows OME-Zarr to be extended
+by path, and an extension scheme that allows OME-Zarr to be extended
 with new node types and metadata while maintaining interoperability.
 
 The mechanism also provides a general way to represent collections: groups of
@@ -125,7 +125,7 @@ The goal of this proposal is therefore not simply to introduce another
 collection format. It is to provide a common and extensible foundation for
 representing OME-Zarr objects and their relationships. Collections are an
 important application of this foundation: they allow images and other objects
-to be grouped, nested, referenced locally or remotely, and enriched with
+to be grouped, nested, referenced by path, and enriched with
 additional metadata. The same mechanism can also provide a path for
 incorporating existing OME-Zarr structures and future data types into a more
 consistent framework.
@@ -156,7 +156,7 @@ illustrating individual aspects of the proposal, e.g.:
               "type": "zarr",
               "format": "relative",
               "href": "./s0"
-            },
+            }
           }
         ]
     }
@@ -168,8 +168,8 @@ the use cases described in the Background are provided later in the document.
 
 ### Features deferred to subsequent sub-RFC
 
-This RFC will defer the definition of some features to forthcoming sub-RFCs. 
-In doing so, we aim to help reviewers focus on providing feedback on the core building being defined in this RFC. 
+This RFC will defer the definition of some features to forthcoming sub-RFCs.
+In doing so, we aim to help reviewers focus on providing feedback on the core building blocks being defined in this RFC. 
 In parallel to the review of RFC-8, we will author sub-RFCs for each deferred feature that propose how they will be expressed using the core RFC-8 building blocks defined in this document. 
 As we iterate on the design of RFC-8, we will update the sub-RFCs. 
 All deferred features will be proposed and evaluated via the RFC process before the v1.0 specification is released.
@@ -184,7 +184,7 @@ The following features are being deferred to sub-RFCs:
 | **Absolute and remote references** | Absolute paths and URLs, authentication and security |
 | **snake_case** | Making keys and identifiers consistent with Zarr |
 | **Legacy multiscales** | A `legacy_multiscale` node type for unchanged 0.5 and 0.6 images |
-| **Singlescale images** | A node type for images with a single resolution level. |
+| **Singlescale images** | A node type for images with a single resolution level |
 
 ### Building blocks
 
@@ -406,10 +406,9 @@ Objects that implement `Node` have the following fields:
 | `"type"` | string | yes | Value MUST be a string identifying the node type. |
 | `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
-| `"traits"` | array | no | Value MUST be an array of `Trait` objects. [See traits section](#traits) |
+| `"traits"` | array | no | Value MUST be an array of `Trait` objects. [See traits section](#traits). |
 
 (rfcs:rfc8:abstract-structure-node-field-type)=
-
 ##### Field: `type`
 
 The `type` field of a `Node` defines its structure and semantics, including any additional fields it might have.
@@ -727,10 +726,10 @@ If `"path"` is present, the document it resolves to MUST have a root node of typ
 
 Coordinate systems and transformations can be stored in two distinct locations:
 
-- For multiscale images, they can be stored directly in the coordinateSystems and coordinateTransformations fields of the multiscale node.
+- For multiscale images, they can be stored directly in the `coordinateSystems` and `coordinateTransformations` fields of the multiscale node.
 - For collections of two or more images in a common coordinate system, RFC-5 defines a parent-level metadata format.
   In this layout, `coordinateTransformations` define relationships between different `coordinateSystems`,
-  which may be associated to multiscale images:
+  which may be associated with multiscale images:
 
 ```jsonc
 {
@@ -995,7 +994,7 @@ Any JSON file that makes use of extension-defined custom types MUST declare an e
 The extension manifest has several purposes, all stemming from the intention of making extensions “manageable”. Notably, it is intended to:
 
 - allow figuring out at a glance (1) whether an OME-Zarr image is making use of extensions at all, and (2) if so, which extensions are being used;
-- provide informations about an extension, including pointers to human-readable documentation and machine-readable schemas.
+- provide information about an extension, including pointers to human-readable documentation and machine-readable schemas.
 
 When the metadata of an OME-Zarr image are spread over several JSON files in different Zarr groups, each file MUST carry its own manifest, listing the extensions used in that file. Additionally, the manifest in the root-level `zarr.json` file SHOULD list every extension used in any of the downstream files, so that a reader can find out which extensions are being used in an entire image without having to check all the JSON files in the Zarr hierarchy.
 
@@ -1034,9 +1033,15 @@ Viewers that do not explicitly support an extension MAY use the provided schema(
 
 #### The `mustUnderstand` flag
 
-Some extensions are intended to only add non-essential information, such as a viewer’s display settings, or a description of how the image was acquired. A reader that ignores such extensions can still interpret the rest of the data correctly. Other extensions may change what the data _means_, e.g. a coordinate transformation the reader cannot apply, or pixel values that are not intensities. A reader that ignores those would be at risk at misleading its users. The `mustUnderstand` flag lets writers state which case applies for any given extension.
+Some extensions are intended to only add non-essential information, such as a viewer’s display settings, or a description of how the image was acquired. A reader that ignores such extensions can still interpret the rest of the data correctly. Other extensions may change what the data _means_, e.g. a coordinate transformation the reader cannot apply, or pixel values that are not intensities. A reader that ignores those would be at risk of misleading its users. The `mustUnderstand` flag lets writers state which case applies for any given extension.
 
-When a reader encounters a custom type that (1) it does not explicitly support and (2) is defined by an extension whose `mustUnderstand` flag is set to `true`, the reader MUST NOT silently fall back to a generic interpretation of the object; it MAY skip the object and report it as unsupported; it MAY continue to interpret the rest of the dataset. When the custom type is a [trait](#traits), this paragraph applies to the object that is carrying the trait.
+When a reader encounters a custom type that (1) it does not explicitly support and (2) is defined by an extension whose `mustUnderstand` flag is set to `true`, the reader:
+
+- MUST NOT silently fall back to a generic interpretation of the object;
+- MAY skip the object and report it as unsupported;
+- MAY continue to interpret the rest of the dataset.
+
+When the custom type is a [trait](#traits), these rules apply to the object that is carrying the trait.
 
 Readers MAY use the extension manifest to decide up front whether an OME-Zarr image is likely to be fully supported, without waiting to encounter an unknown custom type.
 
@@ -1057,7 +1062,7 @@ This example illustrates an extension with ID `https://ngff.example.org/omero/` 
                 "id": "https://ngff.example.org/omero/",
                 "version": "0.3",
                 "name": "OMERO connector extension for OME-Zarr",
-                "description": "An extension to allow referring to remote OMERO images from within a OME-Zarr image.",
+                "description": "An extension to allow referring to remote OMERO images from within an OME-Zarr image.",
                 "homepage": "https://ngff.example.org/omero/",
                 "schemas": [
                     {
@@ -1068,10 +1073,12 @@ This example illustrates an extension with ID `https://ngff.example.org/omero/` 
             }
         ],
         "type": "collection",
+        "id": "000003"
         "nodes": [
             {
                 "name": "original-acquisition",
                 "type": "multiscale",
+                "id": "000001",
                 "path": {
                     "type": "https://ngff.example.org/omero/OMEROPath",
                     "href": "https://omero.example.org/webclient/?show=image-48213",
@@ -1083,6 +1090,7 @@ This example illustrates an extension with ID `https://ngff.example.org/omero/` 
             {
                 "name": "segmentation",
                 "type": "multiscale",
+                "id": "000002",
                 "path": {"type": "zarr", "format": "relative", "href": "./segmentation"}
             }
         ]
@@ -1305,7 +1313,7 @@ All object types that may be found in an OME-Zarr JSON file ultimately belong to
 
 Built-in types are identified by a specification-defined keyword, while custom types are identified by an identifier derived from the identifier of the extension that defines them, as explained in the [“Extensions” section](#extension-and-custom-type-identifiers).
 
-Built-in types can further be subdivided into **core types**, **recommended types**, and **optional**. As the name suggests, the difference between the two categories lies in what is required from OME-Zarr implementations: a compliant OME-Zarr implementation MUST support all core types, SHOULD support recommended types, and MAY support optional types.
+Built-in types can further be subdivided into **core types**, **recommended types**, and **optional types**. As the name suggests, the difference between the three categories lies in what is required from OME-Zarr implementations: a compliant OME-Zarr implementation MUST support all core types, SHOULD support recommended types, and MAY support optional types.
 
 Custom types are initially all OPTIONAL. However, future revisions of the specification may promote a particular custom type to the level of a recommended type, if there is agreement within the community (through the specification revision process, that is RFCs) that the custom type is well designed, useful, and widespread enough to warrant such a promotion.
 
@@ -1485,7 +1493,7 @@ With this proposal the volume is written as a collection rather than as one imag
 ## Other Examples
 
 The examples below demonstrate combinations of various features in this
-proposal. Further example can be found under
+proposal. Further examples can be found under
 https://github.com/normanrz/ngff-rfc8-collection-examples/.
 
 ### A multiscale group with a single resolution level
@@ -1594,6 +1602,7 @@ https://github.com/normanrz/ngff-rfc8-collection-examples/.
                     "type": "example-viewer.org/ngff/settings",
                     "isDisabled": true
                 },
+                {
                 ... // arbitrary user-defined metadata
                 }
             ]
@@ -1864,7 +1873,7 @@ With traits, the node type stays a known core type, so the data can still be tra
 Traits further allow partial support and modular validation: an implementation can support a subset of traits, and each trait is validated against its own schema.
 Finally, previous versions of the specification already compose metadata on one group (`multiscales`, `labels`, `omero`), and traits keep that model.
 
-This was abandoned in favour of the [trait](#traits) concept, which is inspired by traits in Rust and comparable to interfaces in Java and extensions in STAC.
+The [trait](#traits) concept is inspired by traits in Rust and comparable to interfaces in Java and extensions in STAC.
 Node types describe structure (how a node is traversed) and traits describe meaning.
 Exclusivity between traits has to be stated explicitly in the trait specifications.
 Extensions may still define new node types for structures that the core node types do not cover.
