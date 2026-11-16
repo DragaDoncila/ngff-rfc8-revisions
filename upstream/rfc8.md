@@ -170,7 +170,7 @@ the use cases described in the Background are provided later in the document.
 
 This RFC will defer the definition of some features to forthcoming sub-RFCs. 
 In doing so, we aim to help reviewers focus on providing feedback on the core building being defined in this RFC. 
-In parallel to the review of RFC-8, we will author sub-RFCs for each deferred feature that propose how they will be expressed using the core RFC-8 building blocks. 
+In parallel to the review of RFC-8, we will author sub-RFCs for each deferred feature that propose how they will be expressed using the core RFC-8 building blocks defined in this document. 
 As we iterate on the design of RFC-8, we will update the sub-RFCs. 
 All deferred features will be proposed and evaluated via the RFC process before the v1.0 specification is released.
 
@@ -222,12 +222,12 @@ used to build up the definition of an image.
 (rfcs:rfc8:path-interface-field-type)=
 ##### Field: `type`
 
-The `type` field of a `Path` object defines how the path is interpreted. This RFC defines two unprefixed path types: `zarr` and `json`:
+The `type` field of a `Path` object defines how the path is interpreted. This RFC defines two path types: `zarr` and `json`:
 
 - The `"zarr"` type is used for paths that reference nodes in a Zarr array or
   group. Implementations MUST append `zarr.json` to the path to access the
   metadata of the referenced node.
-- The `"json"` type is used for paths that reference nodes in a JSON file.
+- The `"json"` type is used for paths that reference nodes in an arbitrary JSON file.
 
 The `type` field of a `Path` object is an extension point. For detail on how to extend the `type` field with new values, see [Extensions](#extensions).
 
@@ -304,11 +304,11 @@ Every declaration MUST have the following fields:
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be the kind of the declared object, e.g. `"collection"` or `"multiscale"` for nodes and `"coordinate_system"` for coordinate systems. |
-| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document. IDs MUST follow the [ID rules](#ids). |
+| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 
 Additional fields, traits and child nodes of an object are defined on its declaration.
 Everywhere else, the object is referred to with a [`Reference`](#reference-interface).
-Declarations use the `id` key and references use the `ref` key, so that a declaration can always be told apart from a reference.
+Declarations use the `id` key and references use the `ref` key, so that a declaration can always be distinguished from a reference.
 
 (rfcs:rfc8:reference-interface)=
 #### `Reference` interface
@@ -347,9 +347,12 @@ A reference to a coordinate system that is declared in another document:
 
 A reference MUST be either a string or an object.
 
-A string reference MUST be the `id` of a declaration in the current metadata document.
-A string reference MAY only be used where the field that holds it determines the `type` of the referenced declaration, e.g. the `output` of a coordinate transformation, which always references a coordinate system.
-A string reference is equivalent to an object reference whose `type` is the type determined by the field, whose `ref` is the string, and which has no `path`.
+String references MAY be used for convenience and are subject to the following requirements:
+
+- A string reference MUST be the `id` of a declaration in the current metadata document.
+- A string reference MUST only be used if the field that holds it unambiguously determines the `type` of the referenced declaration, e.g. the `output` field of a `coordinateTransformation` unambiguously references a `coordinateSystem` declaration somewhere.
+
+A string reference is equivalent to an object reference whose `type` is the type determined by the field holding the reference, whose `ref` is the string, and which has no `path`.
 
 An object reference MUST have the following fields:
 
@@ -368,7 +371,7 @@ In particular, a reference MUST NOT carry traits or child nodes; these belong to
 - A string reference is resolved within the current metadata document.
 - If the `path` of an object reference is absent, `ref` is resolved within the current metadata document.
 - If the `path` of an object reference is present, `ref` is resolved within the metadata document that `path` locates.
-- The resolved declaration MUST have the `type` that the reference names or, for a string reference, the type that the field determines.
+- The resolved declaration MUST have the `type` that the reference names or, for a string reference, the type that its field determines.
   Implementations MUST report an error if no declaration with the given ID exists in the resolved document, or if its `type` does not match.
 
 (rfcs:rfc8:abstract-structure)=
@@ -378,8 +381,7 @@ The proposal introduces a common Node structure for different types of OME-Zarr
 metadata objects. Nodes can represent images or collections, and can be nested
 or referenced by path. Collections provide a mechanism for grouping nodes and
 may have metadata attached to them, while nodes may carry additional metadata
-describing their role within a collection. Nodes can be referenced locally or
-remotely, without relying on a file system hierarchy. Images may be added as
+describing their role within a collection. Images may be added as
 nodes to multiple collections. Arbitrary user or implementation metadata may be
 added to collections or nodes, which is an opportunity to add metadata that is
 only valid for a node in the context of a collection (e.g. rendering settings).
@@ -402,7 +404,7 @@ Objects that implement `Node` have the following fields:
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be a string identifying the node type. |
-| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document. IDs MUST follow the [ID rules](#ids). |
+| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
 | `"traits"` | array | no | Value MUST be an array of `Trait` objects. [See traits section](#traits) |
 
@@ -421,7 +423,8 @@ The `type` field of a `Node` is an extension point. For detail on how to extend 
 ##### Field: `version`
 
 A `Node` object may be used as the root object of the `ome` key, in which case a `version` field, as defined in previous spec versions, is also required.
-Non-root `Node` objects SHOULD NOT have a `version` field and MUST NOT have a different `version` value than the root `Node`.
+Non-root `Node` objects, e.g. those declared in the `nodes` field of a `collection` node,
+SHOULD NOT have a `version` field and MUST NOT have a different `version` value than the root `Node`.
 
 (rfcs:rfc8:abstract-structure-traits)=
 #### Traits
@@ -557,18 +560,18 @@ A future revision may give more guidance once the Zarr specification is finalize
 Building on the core building blocks and the abstract structure, the following
 sections define concrete node types for collections and
 multiscale images, and integrate coordinate systems and transformations from
-RFC-5. Existing OME-Zarr structures such as multiscales are reworked within the Node/Collection-based framework.
+RFC-5.
 
 (rfcs:rfc8:collection-node)=
 #### `Collection` node
 
-[Collections](#collection-node) are arbitrary groups of `Node`s` which can be
+[Collections](#collection-node) are arbitrary groups of `Node`s which can be
 specialised for different use cases. Collections can be used to group together
 images, including segmentations, prediction maps and other derived images as
 well as other data types ("nodes"). Collections can be nested. Collections can
-have metadata attached. Within collections, nodes can also have metadata, which
-complements or overrides the nodes' own metadata. Nodes within collections are
-referenced by paths instead of relying on a file system hierarchy.
+have metadata attached, and nodes within a collection can also have node-level
+metadata. Nodes within collections are referenced by paths instead of relying
+on a specific file system hierarchy.
 
 (rfcs:rfc8:collection-node-schema)=
 ##### Schema
@@ -576,7 +579,7 @@ referenced by paths instead of relying on a file system hierarchy.
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"collection"`. |
-| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document. IDs MUST follow the [ID rules](#ids). |
+| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
 | `"nodes"` | array | no | Value MUST be an array of `Node` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
@@ -611,7 +614,7 @@ If `"path"` is present, the document it resolves to MUST have a root node of typ
 #### `Array` object
 
 An `Array` object represents one resolution level of an OME-Zarr multiscale image.
-This new interface replaces the dataset metadata defined in the previous versions of the OME-Zarr specification.
+This new interface replaces the `dataset` metadata defined in the previous versions of the OME-Zarr specification.
 
 `Array` objects are not nodes: they cannot appear in a `nodes` array and cannot be the root object of the `ome` key.
 Instead, they are stored in the `data` field of a [`Multiscale` node](#multiscale-node), which is a leaf node.
@@ -625,8 +628,6 @@ Instead, they are stored in the `data` field of a [`Multiscale` node](#multiscal
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"downsamplingTransformations"` | array | no | Value MUST be an array of [`Downsampling Transformation`](#downsampling-transformation-interface) objects, from this resolution level to the highest-resolution level. |
-
-`Array` objects represent resolution levels within a multiscale pyramid.
 
 (rfcs:rfc8:array-node-field-downsamplingTransformations)=
 ##### Field: `downsamplingTransformations`
@@ -686,7 +687,7 @@ A `Multiscale` node is a leaf node: it has no child nodes. Its resolution levels
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"multiscale"`. |
-| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document. IDs MUST follow the [ID rules](#ids). |
+| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
 | `"data"` | array | no | Value MUST be an array of `Array` objects. [See array object](#array-object). |
 | `"path"` | object | no | Value MUST be a `Path` object. |
@@ -831,7 +832,7 @@ A coordinate system that is declared in another document is referenced with an o
 }
 ```
 
-The `type` field of a coordinate transformation defines its mathematical operation. RFC-5 defines several unprefixed transformation types including `identity`, `scale`, `translation`, and others.
+The `type` field of a coordinate transformation defines its mathematical operation. RFC-5 defines several core transformation types including `identity`, `scale`, `translation`, and others.
 
 The `type` field of a `CoordinateTransformation` is an extension point. For detail on how to extend the `type` field with new values, see [Extensions](#extensions).
 
@@ -842,7 +843,7 @@ The `Coordinate System` objects have the following fields:
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"coordinate_system"`. |
-| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document. IDs MUST follow the [ID rules](#ids). |
+| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 | `"name"` | string | no | More descriptive name for the coordinate system, if needed. |
 | `"axes"` | array of Axis objects | yes | Value MUST be an array of axes, as defined in RFC-5. |
 
@@ -929,7 +930,7 @@ under Damien's proposal
 
 ## Extensions
 
-This section describes an extensibility mechanism by which anyone can unilateraly extend the OME-Zarr specification and store, under the `ome` attribute of a `zarr.json` file (or any standalone JSON file), additional metadata that were not envisioned by the specification, all the while maintaining interoperability with OME-Zarr applications.
+This section describes an extensibility mechanism by which anyone can unilaterally extend the OME-Zarr specification and store, under the `ome` attribute of a `zarr.json` file (or any standalone JSON file), additional metadata that were not envisioned by the specification, all the while maintaining interoperability with OME-Zarr applications.
 
 The basic principle is that an extension compliant with this extensibility mechanism can extend the specification by **defining additional, custom types**. An OME-Zarr extension is therefore essentially a set of custom types.
 
@@ -951,7 +952,7 @@ In the rest of this document, the word “extension” will be understood as ref
 
 #### Desired characteristics for OME-Zarr’s extensibility mechanism
 
-(Those characteristics are _not_ listed in any particular order.)
+(These characteristics are _not_ listed in any particular order.)
 
 1. Anyone can define an extension. Prior permission is not required.
 2. An extension can extend another extension, without arbitrary limits as to the “depth” of an extension chain.
@@ -983,7 +984,7 @@ Custom types can be used in lieu of existing types defined by the specification,
 
 An extension point is a `type` field within an object where (1) the value of the `type` field dictates how the rest of the object is to be interpreted, and (2) the OME-Zarr specification explicitly states that the allowed values in the `type` field “MAY be extended” (exact phrasing does not matter as long as the intention is clear).
 
-At such an extension point, a custom type may be used by specifying its identifier in the `type` field, in lieu of one the values allowed by the specification. The custom type, as defined by the extension it belongs to, will then dictate how the object is to be interpreted.
+At such an extension point, a custom type may be used by specifying its identifier in the `type` field, in lieu of one of the values allowed by the specification. The custom type, as defined by the extension it belongs to, will then dictate how the object is to be interpreted.
 
 For example, the [`Path` interface](#path-interface) proposed by this very RFC has an extension point: it has a `type` field defined as accepting two values (`zarr` and `json`); the value dictates how the entire `Path` object is to be interpreted; and the specification explicitly states it is an extension point. An extension could then define a new, custom type of `Path` object.
 
@@ -1300,7 +1301,7 @@ In this example, two OME-Zarr viewers, “Viewer A” and “Viewer B” each ha
 
 ## Type tiers
 
-All object types that may be found in a OME-Zarr JSON file ultimately belong to one of two categories: **built-in types**, which are defined by the OME-Zarr specification, and **custom types**, which are defined by [extensions](#extensions).
+All object types that may be found in an OME-Zarr JSON file ultimately belong to one of two categories: **built-in types**, which are defined by the OME-Zarr specification, and **custom types**, which are defined by [extensions](#extensions).
 
 Built-in types are identified by a specification-defined keyword, while custom types are identified by an identifier derived from the identifier of the extension that defines them, as explained in the [“Extensions” section](#extension-and-custom-type-identifiers).
 
@@ -1323,6 +1324,7 @@ The following table recapitulates the currently defined built-in types along wit
 | `time` | Axis | Core type | RFC-5 |
 | `channel` | Axis | Core type | RFC-5 |
 | `coordinate` | Axis | Core type | RFC-5 |
+| `anatomical` | Axis orientation | Recommended type | RFC-4 | 
 | `identity` | Coordinate transformation | Core type | RFC-5 |
 | `scale` | Coordinate transformation | Core type | RFC-5 |
 | `translation` | Coordinate transformation | Core type | RFC-5 |
