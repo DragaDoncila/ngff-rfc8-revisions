@@ -47,7 +47,9 @@ Fields that a node type requires sit directly on the node, for example `coordina
 
 The `attributes` dictionary is removed. There is no free-form metadata field. Any additional information must be expressed as a trait.
 
-A node used as the root object of the `ome` key also has a `version` field. Non-root nodes SHOULD NOT have a `version` field and MUST NOT have a different `version` than the root node.
+The root node of a document (the node directly under the `ome` key) MUST have a `version` field. Non-root nodes SHOULD NOT have a `version` field and MUST NOT have a different `version` than the root node.
+
+The root node also carries the `extensionManifest` when the document uses custom types (see §4.2). Non-root nodes MUST NOT have an `extensionManifest`.
 
 ### 2.2 Node types
 
@@ -143,7 +145,7 @@ RFC section: [Extensions](upstream/rfc8.md#extensions). Based on Damien Goutte-G
 
 ### 4.2 Extension manifest
 
-Every JSON document that uses custom types MUST declare an **`extensionManifest`** under the `ome` key, listing every extension used in that document. When the metadata is spread over several documents, each document carries its own manifest, and the root document SHOULD list every extension used anywhere below it.
+Every JSON document that uses custom types MUST declare an **`extensionManifest`** on its root node (directly under the `ome` key), listing every extension used in that document. When the metadata is spread over several documents, each document carries its own manifest, and the root document SHOULD list every extension used anywhere below it.
 
 Each manifest entry has:
 
