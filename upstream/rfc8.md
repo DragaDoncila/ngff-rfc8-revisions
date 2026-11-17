@@ -205,9 +205,9 @@ the use cases described in the Background are provided later in the document.
 ### Features deferred to subsequent sub-RFC
 
 This RFC will defer the definition of some features to forthcoming sub-RFCs.
-In doing so, we aim to help reviewers focus on providing feedback on the core building blocks being defined in this RFC. 
-In parallel to the review of RFC-8, we will author sub-RFCs for each deferred feature that propose how they will be expressed using the core RFC-8 building blocks defined in this document. 
-As we iterate on the design of RFC-8, we will update the sub-RFCs. 
+In doing so, we aim to help reviewers focus on providing feedback on the core building blocks being defined in this RFC.
+In parallel to the review of RFC-8, we will author sub-RFCs for each deferred feature that propose how they will be expressed using the core RFC-8 building blocks defined in this document.
+As we iterate on the design of RFC-8, we will update the sub-RFCs.
 All deferred features will be proposed and evaluated via the RFC process before the v1.0 specification is released.
 
 The following features are being deferred to sub-RFCs:
@@ -426,7 +426,7 @@ only valid for a node in the context of a collection (e.g. rendering settings).
 #### `Node` interface
 
 This RFC defines a basic interface for an OME-Zarr metadata object, which we
-name `Node`. The [Node interface](#node) is a consistent JSON structure for
+name `Node`. The [Node interface](#node-interface) is a consistent JSON structure for
 several different types of OME-Zarr metadata object and the root only stores
 information used for identifying and referencing the object.
 
@@ -442,6 +442,8 @@ Objects that implement `Node` have the following fields:
 | `"type"` | string | yes | Value MUST be a string identifying the node type. |
 | `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
+| `"version"` | string | root node only | Value MUST be the version of the OME-Zarr specification. Required on the root node of a metadata document. See [Field: `version`](#field-version). |
+| `"extensionManifest"` | array | root node only | Value MUST be an array of extension objects. Required on the root node of a metadata document that uses extensions. See [Extension manifest](#extension-manifest). |
 | `"traits"` | array | no | Value MUST be an array of `Trait` objects. [See traits section](#traits). |
 
 (rfcs:rfc8:abstract-structure-node-field-type)=
@@ -457,9 +459,16 @@ The `type` field of a `Node` is an extension point. For detail on how to extend 
 (rfcs:rfc8:abstract-structure-node-field-version)=
 ##### Field: `version`
 
-A `Node` object may be used as the root object of the `ome` key, in which case a `version` field, as defined in previous spec versions, is also required.
+The root node of a metadata document, i.e. the `Node` object stored directly under the `ome` key, MUST have a `version` field, as defined in previous spec versions.
 Non-root `Node` objects, e.g. those declared in the `nodes` field of a `collection` node,
 SHOULD NOT have a `version` field and MUST NOT have a different `version` value than the root `Node`.
+
+(rfcs:rfc8:abstract-structure-node-field-extensionManifest)=
+##### Field: `extensionManifest`
+
+The root node of a metadata document MUST have an `extensionManifest` field if the document uses extension-defined custom types.
+Non-root `Node` objects MUST NOT have an `extensionManifest` field.
+See [Extension manifest](#extension-manifest) for its contents.
 
 (rfcs:rfc8:abstract-structure-traits)=
 #### Traits
@@ -616,6 +625,8 @@ on a specific file system hierarchy.
 | `"type"` | string | yes | Value MUST be `"collection"`. |
 | `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
+| `"version"` | string | root node only | Value MUST be the version of the OME-Zarr specification. Required on the root node of a metadata document. See [Field: `version`](#field-version). |
+| `"extensionManifest"` | array | root node only | Value MUST be an array of extension objects. Required on the root node of a metadata document that uses extensions. See [Extension manifest](#extension-manifest). |
 | `"nodes"` | array | no | Value MUST be an array of `Node` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"traits"` | array | no | Value MUST be an array of `Trait` objects. [See traits section](#traits). |
@@ -724,6 +735,8 @@ A `Multiscale` node is a leaf node: it has no child nodes. Its resolution levels
 | `"type"` | string | yes | Value MUST be `"multiscale"`. |
 | `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document where they are defined. IDs MUST follow the [ID rules](#ids). |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
+| `"version"` | string | root node only | Value MUST be the version of the OME-Zarr specification. Required on the root node of a metadata document. See [Field: `version`](#field-version). |
+| `"extensionManifest"` | array | root node only | Value MUST be an array of extension objects. Required on the root node of a metadata document that uses extensions. See [Extension manifest](#extension-manifest). |
 | `"data"` | array | no | Value MUST be an array of `Array` objects. [See array object](#array-object). |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"coordinateSystems"` | array | yes | Value MUST be an array of `coordinateSystem` objects. |
@@ -952,7 +965,7 @@ The `scene` trait MUST be an object with the following fields:
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"coordinateSystems"` | array | no | Values MUST be valid instances of [`Coordinate System`](#coordinate-system-interface) objects. |
-| `"coordinateTransformations"` | array | yes | Values MUST be valid instances of [`Coordinate transformation`](#coordinate-transformation) objects |
+| `"coordinateTransformations"` | array | yes | Values MUST be valid instances of [`Coordinate transformation`](#coordinate-transformation-interface) objects |
 
 A `scene` metadata object can be defined in the `traits` of a collection to enrich the collection with spatial information of the nodes within the collection.
 The `scene` trait allows to clearly distinguish between the spatial information pertaining to an individual multiscale image (which is stored in the `coordinateSystems` and `coordinateTransformations` fields of the multiscale node)
@@ -1193,7 +1206,7 @@ classes:
             type:
                 description: The object’s type.
                 required: true
-            href: 
+            href:
                 description: Full URL to the image.
                 range: uri
                 required: true
@@ -1368,7 +1381,7 @@ The following table recapitulates the currently defined built-in types along wit
 | `time` | Axis | Core type | RFC-5 |
 | `channel` | Axis | Core type | RFC-5 |
 | `coordinate` | Axis | Core type | RFC-5 |
-| `anatomical` | Axis orientation | Recommended type | RFC-4 | 
+| `anatomical` | Axis orientation | Recommended type | RFC-4 |
 | `identity` | Coordinate transformation | Core type | RFC-5 |
 | `scale` | Coordinate transformation | Core type | RFC-5 |
 | `translation` | Coordinate transformation | Core type | RFC-5 |
@@ -2518,3 +2531,48 @@ intolerable or there is a way to make a change while preserving compatibility,
 that should be explored.
 
 -->
+
+## Changelog
+
+| Date | Description | Link |
+| - | - | - |
+| 2026-06-03 | RFC assigned and published ([v0](./versions/v0-2026-07/index.md)) | [ome/ngff#343](https://github.com/ome/ngff/pull/343) |
+| 2026-08-25 | Restructured for readability ([v1](./versions/v1-2026-08/index.md)) | [ome/ngff#588](https://github.com/ome/ngff/pull/588) |
+| 2026-10-19 | [Comment 1](./comments/1/index.md) (J. Nunez-Iglesias) | [ome/ngff#632](https://github.com/ome/ngff/pull/632) |
+| 2026-10-19 | [Comment 2](./comments/2/index.md) (B. Best) | [ome/ngff#627](https://github.com/ome/ngff/pull/627) |
+| 2026-11-01 | [Comment 3](./comments/3/index.md) (C. Bevilacqua) | [ome/ngff#647](https://github.com/ome/ngff/pull/647) |
+| 2026-11-17 | Revised in response to the first round of comments ([v2](./versions/v2-2026-11/index.md)) | [ome/ngff#667](https://github.com/ome/ngff/pull/667) |
+
+### Changes from v0 to v1
+
+v1 restructured the document for readability, without changing the proposal.
+The RFC was renamed to "Collections and Extensibility", the Overview and Background were rewritten,
+and the content was regrouped into building blocks, abstract structure, core classes and a single Extensions section,
+followed by the user stories and examples.
+
+### Changes from v1 to v2
+
+v2 addresses the first round of comments, Damien Goutte-Gattat's extensibility proposal and [Comment 2](./comments/2/index.md).
+
+| Area | v1 | v2 |
+| - | - | - |
+| Node types | `collection`, `multiscale`, `singlescale` | `collection`, `multiscale`. `singlescale` is deferred to a sub-RFC. |
+| Type-specific metadata | `attributes` dictionary | `traits` list of typed objects |
+| Free-form metadata | `attributes` | Removed. Everything beyond the node fields is a trait. |
+| Extensions | Prefixed names (`myorg:foo`) | URI-based types, declared in an `extensionManifest` on the root node |
+| Type tiers | — | Built-in types are core (MUST), recommended (SHOULD) or optional (MAY); custom types start as optional |
+| IDs | Optional on nodes, unique per document | Required on every declaration, unique per document, restricted character set, UUIDv7 recommended if UUIDs are used |
+| Names | Required, unique within the collection | Optional, not required to be unique |
+| `version` | Required on a node used as the root of the `ome` key | Required on the root node only; listed in the node schemas |
+| References | `{"id": …}` | `{"type": …, "ref": …}` with an optional `path`, or a plain ID string where the field fixes the target type |
+| Paths | `{"type": "zarr", "path": …}` | `{"type": "zarr", "format": "relative", "href": …}` |
+| Multiscale layout | `singlescale` child nodes | `data` list of `array` objects with `downsamplingTransformations` |
+| Consolidated metadata | — | Non-normative section: an optional cache for IO performance |
+| HCS, labels, `bioformats2raw.layout`, remote references, snake_case, singlescale, legacy multiscales | In RFC-8 or not covered | Deferred to sub-RFCs |
+
+v2 also:
+
+- Defines the extension manifest, extension schemas (JSON Schema or LinkML) and the `mustUnderstand` flag.
+- Adds rules for path resolution, including cycle detection.
+- Adds user story 11 (training crops), new prior art and abandoned ideas, and future work on extensibility.
+- Adds Damien Goutte-Gattat, Draga Doncila Pop and Juan Nunez-Iglesias as co-authors.
